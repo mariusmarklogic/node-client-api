@@ -20,6 +20,7 @@ const marklogic = require('../');
 const db = marklogic.createDatabaseClient(testconfig.restAdminConnection);
 const op = marklogic.planBuilder;
 const dbWriter = marklogic.createDatabaseClient(testconfig.restWriterConnection);
+let assert = require('assert');
 
 describe('optic write function', function () {
     this.timeout(20000);
@@ -774,11 +775,9 @@ describe('optic write function', function () {
 
     it('test write with json attachments', function (done) {
         const bindingParam = "bindingJSONFiles";
-
-        const rows = [{rowId: 1, doc: 'doc1.json', uri: '/test/fromParam/doc1.json'}, {rowId: 1, doc: 'doc2.json', uri: '/test/fromParam/doc2.json'}];
-        // const attachments = [{"doc1.json": "{\"desc\":2}"}];
-        const attachments = [{'doc1.json': {desc: "desc1"}, 'doc2.json': {desc: "desc2"}}];
-        const metadata = {"attachments": {"docs": [{"rowsField": bindingParam, "column": "doc"}]}};
+        let fs = require('fs');
+        const rows = [{rowId: 1, doc: JSON.parse(fs.readFileSync('./test-basic/data/doc1.json', 'utf8')), uri: '/test/fromParam/doc1.json'},
+            {rowId: 1, doc: JSON.parse(fs.readFileSync('./test-basic/data/doc2.json', 'utf8')), uri: '/test/fromParam/doc2.json'}];
         const outputCols = [{"column": "rowId", "type": "integer", "nullable": false}, {
             "column": "doc",
             "type": "none",
@@ -790,15 +789,17 @@ describe('optic write function', function () {
         }];
 
         const planBuilderTemplate = op.fromParam(bindingParam, null, outputCols).write();
-        const bindParam = {[bindingParam]: rows, attachments, metadata};
+        const bindParam = {[bindingParam]: rows};
 
         db.rows.query(planBuilderTemplate, null, bindParam).then(res => {
             try {
                 const rows = res.rows;
                 console.log(rows);
                 rows[0].rowId.value.should.equal(1);
-                rows[0].doc.value.should.equal("doc1.json");
+                assert(JSON.stringify(rows[0].doc.value).includes('desc1'));
                 rows[0].uri.value.should.equal('/test/fromParam/doc1.json');
+                assert(JSON.stringify(rows[1].doc.value).includes('desc2'));
+                rows[1].uri.value.should.equal('/test/fromParam/doc2.json');
                 done();
             } catch (e) {
                 done(e);
@@ -811,10 +812,7 @@ describe('optic write function', function () {
     it('test write with json attachments-2', function (done) {
         const bindingParam = "bindingJSONFiles";
 
-        const rows = [{rowId: 1, doc: 'doc1.json', uri: '/test/fromParam/doc1.json'}];
-        const attachments = [{"doc1.json": "{\"desc\":2}"}];
-        // const attachments = [{'doc1.json': {desc: "desc1"}}];
-        const metadata = {"attachments": {"docs": [{"rowsField": bindingParam, "column": "doc"}]}};
+        const rows = [{rowId: 1, doc: {desc: "desc1"}, uri: '/test/fromParam/doc3.json'}];
         const outputCols = [{"column": "rowId", "type": "integer", "nullable": false}, {
             "column": "doc",
             "type": "none",
@@ -826,15 +824,15 @@ describe('optic write function', function () {
         }];
 
         const planBuilderTemplate = op.fromParam(bindingParam, null, outputCols).write();
-        const bindParam = {[bindingParam]: rows, attachments, metadata};
+        const bindParam = {[bindingParam]: rows};
 
         db.rows.query(planBuilderTemplate, null, bindParam).then(res => {
             try {
                 const rows = res.rows;
                 console.log(rows);
                 rows[0].rowId.value.should.equal(1);
-                rows[0].doc.value.should.equal("doc1.json");
-                rows[0].uri.value.should.equal('/test/fromParam/doc1.json');
+                assert(JSON.stringify(rows[0].doc.value).includes('desc1'));
+                rows[0].uri.value.should.equal('/test/fromParam/doc3.json');
                 done();
             } catch (e) {
                 done(e);
